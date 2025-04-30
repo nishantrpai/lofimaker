@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, MutableRefObject } from "react"
 import { Disc3, Play, Square, Volume2, AudioWaveformIcon as Waveform } from "lucide-react"
 import { Slider } from "@/components/ui/slider"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,22 @@ import SamplePads from "@/components/sample-pads"
 import MixerControls from "@/components/mixer-controls"
 import VinylEffect from "@/components/vinyl-effect"
 import dynamic from "next/dynamic"
+
+// Add TypeScript declaration for midi-sounds-react
+declare module 'midi-sounds-react' {
+  export interface MidiSounds {
+    cacheInstrument?: (instrumentId: number) => void;
+    setDrumVolume?: (instrumentId: number, volume: number) => void;
+    playDrumsNow?: (instruments: number[]) => void;
+  }
+  // Default export
+  export default function MIDISounds(props: {
+    appElementName: string;
+    instruments: number[];
+    drums: number[];
+    ref?: any;
+  }): JSX.Element;
+}
 
 // Import MIDISounds dynamically with no SSR to avoid React Modal issues
 const MIDISounds = dynamic(() => import("midi-sounds-react"), {
@@ -26,6 +42,51 @@ const DRUM_INSTRUMENTS = {
   TOM: 47, // Low-Mid Tom
   CLAP: 39, // Hand Clap
   SHAKER: 70, // Maracas
+  COWBELL: 56, // Cowbell
+  TAMBOURINE: 54, // Tambourine
+  CONGA: 64, // Low Conga
+  CABASA: 69, // Cabasa
+  GUIRO: 73, // Short Guiro
+  VIBRASLAP: 58, // Vibraslap
+  CUICA: 78, // Mute Cuica
+  TRIANGLE: 80, // Mute Triangle
+}
+
+// Define Track type
+interface Track {
+  id: number;
+  name: string;
+  volume: number;
+  pan: number;
+  mute: boolean;
+  solo: boolean;
+  instrument: number;
+}
+
+// Available instruments to add
+const AVAILABLE_INSTRUMENTS = [
+  { name: "Kick", id: DRUM_INSTRUMENTS.KICK },
+  { name: "Snare", id: DRUM_INSTRUMENTS.SNARE },
+  { name: "Hi-hat", id: DRUM_INSTRUMENTS.HIHAT },
+  { name: "Perc", id: DRUM_INSTRUMENTS.PERC },
+  { name: "Rim", id: DRUM_INSTRUMENTS.RIM },
+  { name: "Tom", id: DRUM_INSTRUMENTS.TOM },
+  { name: "Clap", id: DRUM_INSTRUMENTS.CLAP },
+  { name: "Shaker", id: DRUM_INSTRUMENTS.SHAKER },
+  { name: "Cowbell", id: DRUM_INSTRUMENTS.COWBELL },
+  { name: "Tambourine", id: DRUM_INSTRUMENTS.TAMBOURINE },
+  { name: "Conga", id: DRUM_INSTRUMENTS.CONGA },
+  { name: "Cabasa", id: DRUM_INSTRUMENTS.CABASA },
+  { name: "Guiro", id: DRUM_INSTRUMENTS.GUIRO },
+  { name: "Vibraslap", id: DRUM_INSTRUMENTS.VIBRASLAP },
+  { name: "Cuica", id: DRUM_INSTRUMENTS.CUICA },
+  { name: "Triangle", id: DRUM_INSTRUMENTS.TRIANGLE },
+]
+
+// Define Instrument type
+interface Instrument {
+  name: string;
+  id: number;
 }
 
 export default function LofiBeatmaker() {
@@ -33,7 +94,7 @@ export default function LofiBeatmaker() {
   const [bpm, setBpm] = useState(85)
   const [currentStep, setCurrentStep] = useState(0)
   const [isInitialized, setIsInitialized] = useState(false)
-  const [tracks, setTracks] = useState([
+  const [tracks, setTracks] = useState<Track[]>([
     { id: 1, name: "Kick", volume: 0.8, pan: 0, mute: false, solo: false, instrument: DRUM_INSTRUMENTS.KICK },
     { id: 2, name: "Snare", volume: 0.7, pan: 0, mute: false, solo: false, instrument: DRUM_INSTRUMENTS.SNARE },
     { id: 3, name: "Hi-hat", volume: 0.6, pan: 0.2, mute: false, solo: false, instrument: DRUM_INSTRUMENTS.HIHAT },
@@ -53,12 +114,26 @@ export default function LofiBeatmaker() {
       .fill(0)
       .map(() => Array(16).fill(false)),
   )
+  
+  // Get currently used instruments to filter the available instruments list
+  const [availableInstruments, setAvailableInstruments] = useState<Instrument[]>([])
+  
+  // Track highest ID to ensure unique IDs for new tracks
+  const nextIdRef = useRef(Math.max(...tracks.map(track => track.id)) + 1)
 
   // Reference to the MIDISounds component
-  const midiSounds = useRef(null)
-  const sequencerInterval = useRef(null)
-  const vinylNoiseInterval = useRef(null)
-  const containerRef = useRef(null)
+  const midiSounds = useRef<any>(null)
+  const sequencerInterval = useRef<NodeJS.Timeout | null>(null)
+  const vinylNoiseInterval = useRef<NodeJS.Timeout | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  
+  // Update available instruments whenever tracks change
+  useEffect(() => {
+    const usedInstrumentIds = tracks.map(track => track.instrument)
+    setAvailableInstruments(
+      AVAILABLE_INSTRUMENTS.filter(instrument => !usedInstrumentIds.includes(instrument.id))
+    )
+  }, [tracks])
 
   // Initialize MIDI sounds
   useEffect(() => {
@@ -66,15 +141,17 @@ export default function LofiBeatmaker() {
     if (midiSounds.current) {
       try {
         // Load all drum instruments
-        tracks.forEach((track) => {
-          if (midiSounds.current.cacheInstrument) {
-            midiSounds.current.cacheInstrument(track.instrument)
+        const allInstruments = Object.values(DRUM_INSTRUMENTS)
+        
+        allInstruments.forEach(instrumentId => {
+          if (midiSounds.current?.cacheInstrument) {
+            midiSounds.current.cacheInstrument(instrumentId)
           }
         })
 
         // Set initial volumes
         tracks.forEach((track) => {
-          if (midiSounds.current.setDrumVolume) {
+          if (midiSounds.current?.setDrumVolume) {
             midiSounds.current.setDrumVolume(track.instrument, track.volume)
           }
         })
@@ -101,7 +178,7 @@ export default function LofiBeatmaker() {
     if (midiSounds.current && isInitialized) {
       tracks.forEach((track) => {
         // Set drum volume
-        if (midiSounds.current.setDrumVolume) {
+        if (midiSounds.current?.setDrumVolume) {
           midiSounds.current.setDrumVolume(track.instrument, track.mute ? 0 : track.volume)
         }
       })
@@ -122,17 +199,17 @@ export default function LofiBeatmaker() {
       const crackleSound = 128 // Hi-hat (pedal) - works well for subtle crackle
 
       try {
-        if (midiSounds.current.cacheInstrument) {
+        if (midiSounds.current?.cacheInstrument) {
           midiSounds.current.cacheInstrument(crackleSound)
         }
 
         vinylNoiseInterval.current = setInterval(
           () => {
             // Additional check to make sure the effect is still enabled when the interval fires
-            if (midiSounds.current && midiSounds.current.playDrumsNow) {
+            if (midiSounds.current && midiSounds.current?.playDrumsNow) {
               // Randomize the volume based on the vinyl age and amount
               const randomVolume = Math.random() * vinylEffect.amount * 0.05 * vinylEffect.age
-              if (midiSounds.current.setDrumVolume) {
+              if (midiSounds.current?.setDrumVolume) {
                 midiSounds.current.setDrumVolume(crackleSound, randomVolume)
               }
               midiSounds.current.playDrumsNow([crackleSound])
@@ -161,7 +238,9 @@ export default function LofiBeatmaker() {
 
     if (isPlaying && midiSounds.current && isInitialized) {
       const stepDuration = ((60 / bpm) * 1000) / 4 // Duration of a 16th note in ms
-      let step = 0
+      
+      // Store the current step in a ref so it persists across effect reruns
+      let step = currentStep;
 
       try {
         sequencerInterval.current = setInterval(() => {
@@ -171,10 +250,11 @@ export default function LofiBeatmaker() {
           // Play sounds for this step
           sequence.forEach((trackSequence, trackIndex) => {
             if (
+              trackIndex < tracks.length && // Make sure trackIndex is valid
               trackSequence[step] &&
               !tracks[trackIndex].mute &&
               midiSounds.current &&
-              midiSounds.current.playDrumsNow
+              midiSounds.current?.playDrumsNow
             ) {
               midiSounds.current.playDrumsNow([tracks[trackIndex].instrument])
             }
@@ -194,7 +274,7 @@ export default function LofiBeatmaker() {
         clearInterval(sequencerInterval.current)
       }
     }
-  }, [isPlaying, sequence, tracks, bpm, isInitialized])
+  }, [isPlaying, sequence, tracks, bpm, isInitialized, currentStep])
 
   const togglePlay = () => {
     if (!isInitialized) return
@@ -202,7 +282,7 @@ export default function LofiBeatmaker() {
   }
 
   const triggerSample = (trackIndex: number) => {
-    if (midiSounds.current && isInitialized && !tracks[trackIndex].mute && midiSounds.current.playDrumsNow) {
+    if (midiSounds.current && isInitialized && !tracks[trackIndex].mute && midiSounds.current?.playDrumsNow) {
       try {
         midiSounds.current.playDrumsNow([tracks[trackIndex].instrument])
       } catch (error) {
@@ -217,9 +297,69 @@ export default function LofiBeatmaker() {
 
   const toggleStep = (trackIndex: number, stepIndex: number) => {
     const newSequence = [...sequence]
+    // Ensure this track exists in sequence
+    if (trackIndex >= newSequence.length) {
+      // Add empty tracks to sequence if needed
+      while (trackIndex >= newSequence.length) {
+        newSequence.push(Array(16).fill(false))
+      }
+    }
+    
     newSequence[trackIndex] = [...newSequence[trackIndex]]
     newSequence[trackIndex][stepIndex] = !newSequence[trackIndex][stepIndex]
     setSequence(newSequence)
+  }
+  
+  // Function to remove a track
+  const removeTrack = (trackId: number) => {
+    // Find index of track to remove
+    const trackIndex = tracks.findIndex(track => track.id === trackId)
+    
+    // Don't allow removing the last track
+    if (tracks.length <= 1) return
+    
+    // Update tracks state
+    setTracks(tracks.filter(track => track.id !== trackId))
+    
+    // Update sequence state by removing the track's pattern
+    setSequence(prevSequence => {
+      const newSequence = [...prevSequence]
+      if (trackIndex !== -1) {
+        newSequence.splice(trackIndex, 1)
+      }
+      return newSequence
+    })
+  }
+  
+  // Function to add a new track
+  const addTrack = (instrumentName: string, instrumentId: number) => {
+    const newTrackId = nextIdRef.current
+    nextIdRef.current = nextIdRef.current + 1
+    
+    const newTrack: Track = {
+      id: newTrackId,
+      name: instrumentName,
+      volume: 0.7,
+      pan: 0,
+      mute: false,
+      solo: false,
+      instrument: instrumentId
+    }
+    
+    // Add new track to tracks state
+    setTracks([...tracks, newTrack])
+    
+    // Update sequence state by adding an empty pattern
+    setSequence(prevSequence => {
+      const newSequence = [...prevSequence]
+      newSequence.push(Array(16).fill(false))
+      return newSequence
+    })
+    
+    // Make sure the instrument is cached for playback
+    if (midiSounds.current && midiSounds.current?.cacheInstrument) {
+      midiSounds.current.cacheInstrument(instrumentId)
+    }
   }
 
   return (
@@ -276,7 +416,13 @@ export default function LofiBeatmaker() {
         <div className="space-y-6">
           <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded-lg">
             <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-3">Sample Pads</h2>
-            <SamplePads tracks={tracks} onTriggerSample={triggerSample} />
+            <SamplePads 
+              tracks={tracks} 
+              onTriggerSample={triggerSample} 
+              onRemoveTrack={removeTrack}
+              onAddTrack={addTrack}
+              availableInstruments={availableInstruments}
+            />
           </div>
 
           <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded-lg">
@@ -292,20 +438,14 @@ export default function LofiBeatmaker() {
       <div style={{ display: "none" }}>
         {typeof window !== "undefined" && (
           <MIDISounds
-            ref={midiSounds}
             appElementName="lofi-beatmaker-app"
             instruments={[]}
             drums={[
-              DRUM_INSTRUMENTS.KICK,
-              DRUM_INSTRUMENTS.SNARE,
-              DRUM_INSTRUMENTS.HIHAT,
-              DRUM_INSTRUMENTS.PERC,
-              DRUM_INSTRUMENTS.RIM,
-              DRUM_INSTRUMENTS.TOM,
-              DRUM_INSTRUMENTS.CLAP,
-              DRUM_INSTRUMENTS.SHAKER,
+              // Load all possible drums
+              ...Object.values(DRUM_INSTRUMENTS),
               128, // For vinyl effect
             ]}
+            ref={midiSounds}
           />
         )}
       </div>
