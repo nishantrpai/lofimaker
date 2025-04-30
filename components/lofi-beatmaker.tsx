@@ -22,6 +22,10 @@ const DRUM_INSTRUMENTS = {
   SNARE: 38, // Acoustic Snare
   HIHAT: 42, // Closed Hi-hat
   PERC: 60, // Hi Bongo
+  RIM: 37, // Side Stick
+  TOM: 47, // Low-Mid Tom
+  CLAP: 39, // Hand Clap
+  SHAKER: 70, // Maracas
 }
 
 export default function LofiBeatmaker() {
@@ -34,6 +38,10 @@ export default function LofiBeatmaker() {
     { id: 2, name: "Snare", volume: 0.7, pan: 0, mute: false, solo: false, instrument: DRUM_INSTRUMENTS.SNARE },
     { id: 3, name: "Hi-hat", volume: 0.6, pan: 0.2, mute: false, solo: false, instrument: DRUM_INSTRUMENTS.HIHAT },
     { id: 4, name: "Perc", volume: 0.5, pan: -0.3, mute: false, solo: false, instrument: DRUM_INSTRUMENTS.PERC },
+    { id: 5, name: "Rim", volume: 0.6, pan: 0.3, mute: false, solo: false, instrument: DRUM_INSTRUMENTS.RIM },
+    { id: 6, name: "Tom", volume: 0.7, pan: -0.2, mute: false, solo: false, instrument: DRUM_INSTRUMENTS.TOM },
+    { id: 7, name: "Clap", volume: 0.65, pan: 0.1, mute: false, solo: false, instrument: DRUM_INSTRUMENTS.CLAP },
+    { id: 8, name: "Shaker", volume: 0.55, pan: -0.1, mute: false, solo: false, instrument: DRUM_INSTRUMENTS.SHAKER },
   ])
   const [vinylEffect, setVinylEffect] = useState({
     enabled: true,
@@ -41,7 +49,7 @@ export default function LofiBeatmaker() {
     age: 0.5,
   })
   const [sequence, setSequence] = useState(
-    Array(4)
+    Array(8)
       .fill(0)
       .map(() => Array(16).fill(false)),
   )
@@ -105,6 +113,7 @@ export default function LofiBeatmaker() {
     // Clear any existing vinyl noise interval
     if (vinylNoiseInterval.current) {
       clearInterval(vinylNoiseInterval.current)
+      vinylNoiseInterval.current = null;
     }
 
     // If vinyl effect is enabled, create a subtle noise at random intervals
@@ -119,8 +128,8 @@ export default function LofiBeatmaker() {
 
         vinylNoiseInterval.current = setInterval(
           () => {
-            // Only play the crackle if the effect is enabled
-            if (vinylEffect.enabled && midiSounds.current && midiSounds.current.playDrumsNow) {
+            // Additional check to make sure the effect is still enabled when the interval fires
+            if (midiSounds.current && midiSounds.current.playDrumsNow) {
               // Randomize the volume based on the vinyl age and amount
               const randomVolume = Math.random() * vinylEffect.amount * 0.05 * vinylEffect.age
               if (midiSounds.current.setDrumVolume) {
@@ -139,6 +148,7 @@ export default function LofiBeatmaker() {
     return () => {
       if (vinylNoiseInterval.current) {
         clearInterval(vinylNoiseInterval.current)
+        vinylNoiseInterval.current = null;
       }
     }
   }, [vinylEffect, isInitialized])
@@ -214,21 +224,21 @@ export default function LofiBeatmaker() {
 
   return (
     <div
-      className="w-full max-w-4xl bg-white rounded-xl shadow-lg p-6 space-y-6"
+      className="w-full max-w-4xl bg-white dark:bg-black rounded-xl shadow-lg p-6 space-y-6 transition-colors"
       ref={containerRef}
       id="lofi-beatmaker-app"
     >
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-zinc-800">Lo-Fi Beatmaker</h1>
+        <h1 className="text-2xl font-bold text-zinc-800 dark:text-zinc-100">Lo-Fi Beatmaker</h1>
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
-            <Label htmlFor="bpm" className="text-sm font-medium">
+            <Label htmlFor="bpm" className="text-sm font-medium dark:text-zinc-300">
               BPM
             </Label>
             <div className="w-24">
               <Slider id="bpm" min={60} max={140} step={1} value={[bpm]} onValueChange={(value) => setBpm(value[0])} />
             </div>
-            <span className="text-sm font-mono">{bpm}</span>
+            <span className="text-sm font-mono dark:text-zinc-300">{bpm}</span>
           </div>
           <Button
             onClick={togglePlay}
@@ -236,8 +246,8 @@ export default function LofiBeatmaker() {
             size="icon"
             className={
               isPlaying
-                ? "bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700"
-                : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700"
+                ? "bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300"
+                : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-300"
             }
             disabled={!isInitialized}
           >
@@ -248,15 +258,15 @@ export default function LofiBeatmaker() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-6">
-          <div className="bg-zinc-50 p-4 rounded-lg">
-            <h2 className="text-sm font-medium text-zinc-500 mb-3 flex items-center">
+          <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded-lg">
+            <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-3 flex items-center">
               <Waveform className="h-4 w-4 mr-1" /> Step Sequencer
             </h2>
             <StepSequencer sequence={sequence} currentStep={currentStep} tracks={tracks} onToggleStep={toggleStep} />
           </div>
 
-          <div className="bg-zinc-50 p-4 rounded-lg">
-            <h2 className="text-sm font-medium text-zinc-500 mb-3 flex items-center">
+          <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded-lg">
+            <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-3 flex items-center">
               <Volume2 className="h-4 w-4 mr-1" /> Mixer
             </h2>
             <MixerControls tracks={tracks} onUpdateTrack={updateTrackSetting} />
@@ -264,13 +274,13 @@ export default function LofiBeatmaker() {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-zinc-50 p-4 rounded-lg">
-            <h2 className="text-sm font-medium text-zinc-500 mb-3">Sample Pads</h2>
+          <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded-lg">
+            <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-3">Sample Pads</h2>
             <SamplePads tracks={tracks} onTriggerSample={triggerSample} />
           </div>
 
-          <div className="bg-zinc-50 p-4 rounded-lg">
-            <h2 className="text-sm font-medium text-zinc-500 mb-3 flex items-center">
+          <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded-lg">
+            <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-3 flex items-center">
               <Disc3 className="h-4 w-4 mr-1" /> Vinyl Effect
             </h2>
             <VinylEffect effect={vinylEffect} onChange={setVinylEffect} />
@@ -290,6 +300,10 @@ export default function LofiBeatmaker() {
               DRUM_INSTRUMENTS.SNARE,
               DRUM_INSTRUMENTS.HIHAT,
               DRUM_INSTRUMENTS.PERC,
+              DRUM_INSTRUMENTS.RIM,
+              DRUM_INSTRUMENTS.TOM,
+              DRUM_INSTRUMENTS.CLAP,
+              DRUM_INSTRUMENTS.SHAKER,
               128, // For vinyl effect
             ]}
           />

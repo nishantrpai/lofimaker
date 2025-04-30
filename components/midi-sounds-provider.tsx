@@ -9,7 +9,10 @@ const MIDISounds = dynamic(() => import("midi-sounds-react"), {
 })
 
 // Create context
-const MIDISoundsContext = createContext(null)
+const MIDISoundsContext = createContext({
+  midiSounds: null,
+  isReady: false
+});
 
 export function useMIDISounds() {
   return useContext(MIDISoundsContext)

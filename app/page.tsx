@@ -9,7 +9,7 @@ const LofiBeatmaker = dynamic(() => import("@/components/lofi-beatmaker"), {
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-zinc-100 flex items-center justify-center p-4">
+    <main className="min-h-screen bg-zinc-100 dark:bg-stone-900 flex items-center justify-center p-4">
       <LofiBeatmaker />
     </main>
   )
