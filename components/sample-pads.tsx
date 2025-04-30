@@ -1,6 +1,6 @@
 "use client"
 
-import { X, Plus } from "lucide-react"
+import { X, Plus, Mic } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { 
   DropdownMenu, 
@@ -9,6 +9,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuItem
 } from "@/components/ui/dropdown-menu"
+import { cn } from "@/lib/utils"
 
 interface SamplePadsProps {
   tracks: any[]
@@ -16,6 +17,9 @@ interface SamplePadsProps {
   onRemoveTrack?: (trackId: number) => void
   onAddTrack?: (instrumentName: string, instrumentId: number) => void
   availableInstruments?: { name: string; id: number }[]
+  isRecording?: boolean
+  recordingTrack?: number | null
+  onStartRecording?: (trackIndex: number) => void
 }
 
 export default function SamplePads({ 
@@ -23,7 +27,10 @@ export default function SamplePads({
   onTriggerSample, 
   onRemoveTrack,
   onAddTrack,
-  availableInstruments = []
+  availableInstruments = [],
+  isRecording = false,
+  recordingTrack = null,
+  onStartRecording
 }: SamplePadsProps) {
   const padColors = [
     "bg-amber-100 hover:bg-amber-200 border-amber-200 active:bg-amber-300 dark:bg-amber-950 dark:hover:bg-amber-900 dark:border-amber-800 dark:active:bg-amber-800",
@@ -41,24 +48,55 @@ export default function SamplePads({
       {tracks.map((track, index) => (
         <div key={track.id} className="relative group">
           <button
-            className={`h-20 w-full rounded-lg border-2 transition-all ${padColors[index % padColors.length]} ${track.mute ? "opacity-50" : ""} dark:text-gray-200`}
+            className={cn(
+              `h-20 w-full rounded-lg border-2 transition-all ${padColors[index % padColors.length]} ${track.mute ? "opacity-50" : ""} dark:text-gray-200`,
+              recordingTrack === index && "ring-2 ring-rose-500 dark:ring-rose-600 ring-offset-1 dark:ring-offset-black"
+            )}
             onClick={() => onTriggerSample(index)}
           >
             <span className="font-medium text-sm">{track.name}</span>
+            {track.isRecorded && (
+              <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-xs text-zinc-500 dark:text-zinc-400">
+                <Mic className="h-3 w-3 inline mr-1" />
+                <span>Recorded</span>
+              </div>
+            )}
           </button>
-          {onRemoveTrack && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 h-6 w-6 bg-zinc-100/60 hover:bg-zinc-200/70 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70 transition-opacity"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemoveTrack(track.id);
-              }}
-            >
-              <X className="h-3 w-3" />
-              <span className="sr-only">Remove</span>
-            </Button>
+          <div className="absolute top-1 right-1 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {onStartRecording && !isRecording && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 bg-rose-100/60 hover:bg-rose-200/70 dark:bg-rose-900/40 dark:hover:bg-rose-800/60"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStartRecording(index);
+                }}
+              >
+                <Mic className="h-3 w-3 text-rose-600 dark:text-rose-400" />
+                <span className="sr-only">Record</span>
+              </Button>
+            )}
+            {onRemoveTrack && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 bg-zinc-100/60 hover:bg-zinc-200/70 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemoveTrack(track.id);
+                }}
+              >
+                <X className="h-3 w-3" />
+                <span className="sr-only">Remove</span>
+              </Button>
+            )}
+          </div>
+          {isRecording && recordingTrack === index && (
+            <span className="absolute top-1 left-1 flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+            </span>
           )}
         </div>
       ))}
